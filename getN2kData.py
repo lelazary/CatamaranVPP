@@ -15,23 +15,25 @@ import numpy as np
 from modules.Boat import Boat
 from modules.Utils import * 
 
+import csv
+
 def func(x, a, b, c,d):
      return a * np.exp(-b * x) + c
 
 boat = Boat(
   Name = "Outremer51",
-  Lwl = 15.41,   #Length of waterline in meters
-  Bwl = 1.24,    #Beam of each hull
-  Tc = 0.90,     #Maximum draft of haull body
-  i = 5.44,      #half entry angle of the waterline at bow (neglecting the local rounded shape at the stem)
-  Sw = 29.05,    #wetted area of one hull
-  Dc = 6.8779,   #Displacment on one hull in m3
-  Cp = 0.573,    #hull prismatic coefficient
-  At = 0.00,     #immersed part of the transom area at zero speed
-  LCB = 46.4,    # Longitudinal center of buoyancy, in % of Lwl from aft perpendicular
-  S = 5.72,      #Space between hulls, transversal space between the 2 hulls axis
-  S_aero = 11.35,  #Frontal Secion 
-  Cx_aero = 0.40, #he Cx to take into account for the wind drag comptutation (to estimate due to the overall shape of the superstructure)
+  Lwl = 15.41,      #Length of waterline in meters
+  Bwl = 1.24,       #Beam of each hull
+  Tc = 0.90,        #Maximum draft of haull body
+  i = 5.44,         #half entry angle of the waterline at bow (neglecting the local rounded shape at the stem)
+  Sw = 29.05,       #wetted area of one hull
+  Dc = 6.8779,      #Displacment on one hull in m3
+  Cp = 0.573,       #hull prismatic coefficient
+  At = 0.00,        #immersed part of the transom area at zero speed
+  LCB = 46.4,       # Longitudinal center of buoyancy, in % of Lwl from aft perpendicular
+  S = 5.72,         #Space between hulls, transversal space between the 2 hulls axis
+  S_aero = 11.35,   #Frontal Secion 
+  Cx_aero = 0.40,   #The Cx to take into account for the wind drag comptutation (to estimate due to the overall shape of the superstructure)
   Prop_eff = 0.54,  #to estimate with the one for the propeller and the one of the mechanical transmission. Example : 0.54 = 0.6 (propeller) x 0.9 (mechaniccal transmission)
   Cms = 0.70,     # midship section coefficient (section / Tc Bw)
   Cwp = 0.70      #waterplane area coefficient (Sf / Lw Bw)
@@ -53,6 +55,12 @@ parser.add_argument('--y2-data', type=str, required=False,
 
 parser.add_argument('--fit-data', type=str, required=False, 
                     help="Fit a curve to the following data, example 'STW,SOG'")
+
+parser.add_argument('--output-data', type=str, required=False, 
+                    help="Output data to a csv file")
+
+parser.add_argument('--title', type=str, default="", required=False, 
+                    help="Title for the graph")
 
 args = parser.parse_args()
 
@@ -76,6 +84,13 @@ boat_data['t'] = 0
 
 from_datetime = 0
 to_datetime = 0
+
+csv_writer = None
+if args.output_data:
+  data_file = open(args.output_data, 'w')
+  csv_writer = csv.writer(data_file)
+  csv_keys = ['t', 'date', 'time'] + all_data_keys
+  csv_writer.writerow(csv_keys)
 
 plot_data = {}
 while line:
@@ -169,10 +184,15 @@ while line:
             plot_data[k]['x'].append(boat_data['t'])
             plot_data[k]['y'].append(boat_data[k])
       #print(json.dumps(boat_data))
-      
-    #keys = ['STW', 'SOG', 'stb_temp', 'stb_rpm', 'port_temp', 'port_rpm']
-    #keys_values = [str(boat_data[k]) for k in keys if k in boat_data]
-    #print(','.join(keys_values))
+   
+    if (csv_writer):
+      keys_values = []
+      for k in csv_keys:
+        if k in boat_data:
+          keys_values.append(str(boat_data[k]))
+        else:
+          keys_values.append('')
+      csv_writer.writerow(keys_values)
   except Exception as e:
       print("Error in line:", line, ":", e)
   line = sys.stdin.readline()
@@ -207,7 +227,6 @@ if (data2_keys):
 
 plt.ylabel('V(m/s)')
 
-plt.title("Data from " + str(from_datetime) + " to " + str(to_datetime) + " delta: " + str(total_seconds) + " sec")
 
 print(",".join(str(round(stat.mean(plot_data[k]['y']),2)) + "," + str(round(stat.stdev(plot_data[k]['y']),2)) for k in all_data_keys))
 
@@ -226,7 +245,7 @@ for k in fit_data_keys:
   ax3.plot(ax, ay1 , label="fit - " + k + "eq: {}*exp(-{}*t)+{}".format(optimizedParameters[0], optimizedParameters[1], optimizedParameters[2]));
   plt.xlabel('Seconds')
 
-boat_vel = 5
+boat_vel = 5.7
 dt = 0.1
 ax = np.empty(2200)
 ay = np.empty(2200)
@@ -242,8 +261,13 @@ for time in np.arange(0,220,0.1):
     acceleration = (drag * 1000) / (mass+added_mass)
     boat_vel -= (acceleration * dt)
 
-ax3.plot(ax, ay , 'g',  label="model" )
-ax3.legend(loc='upper right')
+#ax3.plot(ax, ay , 'g',  label="model" )
+#ax3.legend(loc='upper right')
 
+if args.output_data:
+  data_file.close()
+
+
+plt.title(args.title + "\nData from " + str(from_datetime) + " to " + str(to_datetime) + " delta: " + str(total_seconds) + " sec")
 #plt.savefig('image.png', dpi=500)
 plt.show()

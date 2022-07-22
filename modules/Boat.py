@@ -3,7 +3,7 @@
 #Created by Lior Elazary
 #liorelazary@gmail.com
 
-
+from scipy import interpolate
 import numpy as np
 import math
 
@@ -40,6 +40,13 @@ class Boat(object):
         self.v_1 = 0.000001  #Viscosity
         self.gravity = 9.81
 
+        KFn = [0.0, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 
+               0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00]
+        KSLw= [0.31, 0.31, 0.207, 0.22, 0.115, 0.27, 0.254619401019476, 0.221749925906412, 
+               0.185193459569124, 0.15600330763872, 0.147544274290155, 0.160587323725399, 
+               0.166656944809014, 0.156439180381845, 0.161839816237945, 0.186530001794723, 
+               0.205479912464803, 0.2163300458397]
+        self.KFunc = interpolate.interp1d(KFn, KSLw)
 
     def set_vel(self, Vb_ms): #Need to set that for the velocity of the vessel
         self.Fn = Vb_ms/math.sqrt(self.gravity*self.Lwl) #Froude number
@@ -50,13 +57,14 @@ class Boat(object):
         self.set_vel(Vb_ms)
 
         self.Df = self.get_frictional_drag(Vb_ms)
-        self.Dr = self.get_wave_drag(Vb_ms)
+        self.Dr = 0#self.get_wave_drag(Vb_ms)
         self.Dr_aero = self.get_aero_drag(Vb_ms)
         self.Dtr = 0  #TODO: is the rear transoms drag
         
         self.D_total = self.Df + self.Dr + self.Dtr + self.Dr_aero  #Total Drag
 
         #print(self.Df, self.Dr, self.Dr_aero, self.D_total)
+        print("Drag:", self.D_total)
         
         return self.D_total
 
@@ -140,12 +148,14 @@ class Boat(object):
           K = d
         else:
           K = d1
+
+        K = self.KFunc(self.Fn)
  
         #print("K=", K, Dr_mg_ratio)
         Dr = (1+K)*(Dr_mg_ratio/100)*(2*self.Dc*self.Rho)*9.81/1000
 
         return Dr
-    
+
     def get_Holtrop_Rw_A(self, Vb_ms):
 
         if Vb_ms == 0:
