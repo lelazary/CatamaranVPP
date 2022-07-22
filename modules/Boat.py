@@ -30,7 +30,10 @@ class Boat(object):
 
         self.Lw_Bw_ratio = self.Lwl/self.Bwl
         self.Lw_Dc = self.Lwl/math.pow(self.Dc, 1/3)
+        self.Bw_Tc_ratio = self.Bwl/self.Tc
+        self.Lw_Tc_ratio = self.Lwl/self.Tc
         self.S_Lw_ratio = self.S/self.Lwl
+        self.Vb_ms = 0
         
 
         self.Rho = 1025 #Salt water density kg/m3
@@ -38,7 +41,13 @@ class Boat(object):
         self.gravity = 9.81
 
 
+    def set_vel(self, Vb_ms): #Need to set that for the velocity of the vessel
+        self.Fn = Vb_ms/math.sqrt(self.gravity*self.Lwl) #Froude number
+        self.Vb_ms = Vb_ms
+
     def get_total_drag(self, Vb_ms):
+
+        self.set_vel(Vb_ms)
 
         self.Df = self.get_frictional_drag(Vb_ms)
         self.Dr = self.get_wave_drag(Vb_ms)
@@ -92,22 +101,21 @@ class Boat(object):
         #Cause the hull to drag sugnificatly (hull speed)
         Fn_hull_speed_ratio = 0.4    
         
-        Fn = Vb_ms/math.sqrt(self.gravity*self.Lwl) #Froude number
-        if (Fn < 0.4):
-          Fn_1 = Eq_1_a*math.pow(Fn,Eq_1_n)
-        elif(Fn >= 0.4 and Fn < 0.6):
-          Fn_1 = Eq_2_a*math.pow(Fn,2)+Eq_2_b*Fn+Eq_2_c
+        if (self.Fn < 0.4):
+          Fn_1 = Eq_1_a*math.pow(self.Fn,Eq_1_n)
+        elif(self.Fn >= 0.4 and self.Fn < 0.6):
+          Fn_1 = Eq_2_a*math.pow(self.Fn,2)+Eq_2_b*self.Fn+Eq_2_c
         else:  #>0.6
-          Fn_1 = Eq_3_a*Fn+Eq_3_b
+          Fn_1 = Eq_3_a*self.Fn+Eq_3_b
         
-        Holtrop_Rw_A = 0
         
-        if Fn < 0.25:
-          Dr_mg_ratio = Holtrop_Rw_A
-        elif Fn>0.4: 
+        if self.Fn < 0.25:
+          Dr_mg_ratio = self.get_Holtrop_Rw_A(Vb_ms)
+        elif self.Fn>0.4: 
           Dr_mg_ratio = Fn_1
         else:
-          Dr_mg_ratio = (Fn-0.25)/0.15*Fn_1+(0.4-Fn)/0.15*Holtrop_Rw_A
+          holtrop_rw_a = self.get_Holtrop_Rw_A(Vb_ms)
+          Dr_mg_ratio = (self.Fn-0.25)/0.15*Fn_1 +(0.4-self.Fn)/0.15*holtrop_rw_a
         
         #print(Dr_mg_ratio)
         
@@ -122,13 +130,13 @@ class Boat(object):
         #print("D:", Coeff_bis, du_pic, du_corr, Coeff_ter_1, Coeff_ter_2, self.S_Lw_ratio)
         #K_inter = math.max(
         d =  ( Coeff_ter_1+(0.6-Coeff_ter_1) 
-              * math.exp(-0.5*(145.0-150.0*self.S_Lw_ratio)*math.pow((Fn-Coeff_bis),2))
+              * math.exp(-0.5*(145.0-150.0*self.S_Lw_ratio)*math.pow((self.Fn-Coeff_bis),2))
              ) * (-2*self.S_Lw_ratio+1.6)*du_pic
         d1 =  ( Coeff_ter_2+(0.6-Coeff_ter_2) 
-              * math.exp(-0.5*(145.0-150.0*self.S_Lw_ratio)*math.pow((Fn-Coeff_bis),2))
+              * math.exp(-0.5*(145.0-150.0*self.S_Lw_ratio)*math.pow((self.Fn-Coeff_bis),2))
              ) * (-2*self.S_Lw_ratio+1.6)*du_pic
         
-        if (Fn > Coeff_bis):
+        if (self.Fn > Coeff_bis):
           K = d
         else:
           K = d1
@@ -138,3 +146,53 @@ class Boat(object):
 
         return Dr
     
+    def get_Holtrop_Rw_A(self, Vb_ms):
+
+        if Vb_ms == 0:
+            return 0
+
+        LwBw = self.Lw_Bw_ratio
+        BwTc = self.Bw_Tc_ratio
+
+        if (self.Lw_Bw_ratio < 12):
+            lambda_1 = 1.446*self.Cp-0.3*self.Lw_Bw_ratio
+        else:
+            lambda_1 = 1.446*self.Cp-0.36
+
+        if (self.Cp<0.8):
+            c16 = 8.07981*self.Cp-13.8673*math.pow(self.Cp,2)+6.984388*math.pow(self.Cp,3)
+        else:
+            c16 = 1.73014-0.7067*self.Cp
+
+        m1 = 0.0140407*(self.Lw_Tc_ratio)-1.75254/self.Lw_Dc-4.79323/self.Lw_Bw_ratio-c16
+
+        LwDc_ratio = math.pow(self.Lw_Dc,3)
+
+        if (LwDc_ratio < 512):
+            c15 = -1.69385
+        elif LwDc_ratio >1727:
+            c15 = 0
+        else:
+            c15 = -1.69385+(self.Lw_Dc-8)/2.36
+
+        d = -0.9
+
+        c2 = 1.0
+        Cm = self.Cms
+        c5 = 1-0.8*self.At/(self.Bwl*self.Dc*self.Cms)
+
+        c7 = 0.0991877700 #TODO, compute from eq
+
+        c1 = 2223105*math.pow(c7,3.78613)*math.pow(1/self.Bw_Tc_ratio,1.07961)*math.pow(90-self.i,-1.37565)
+
+        #print("Vb:", Vb_ms, "Fn:", self.Fn)
+        #print(lambda_1, c16, m1, LwDc_ratio, c15, d, c2, Cm, c5, c7, c1)
+
+        m4 = c15*0.4*math.exp(-0.034*math.pow(self.Fn,-3.29))
+
+        #m1Fn_d = math.pow(self.Fn*m1, d)
+        #m4cos = m4 * math.cos(lambda_1 * math.pow(self.Fn,-2))
+        #math.exp(m1Fn_d + m4cos)a
+
+        return c1*c2*c5*math.exp(m1*math.pow(self.Fn,d)+m4*math.cos(lambda_1*math.pow(self.Fn,-2)))*100
+

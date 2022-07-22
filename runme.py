@@ -1,5 +1,10 @@
 #!/usr/bin/python3
 
+
+#Compute Catamaran Vpp and compare aginst mesurments
+#Lior Elazary liorelazary@gmail.com
+#Inspired from python-vpp and https://www.boatdesign.net/threads/sa-vpp-power-catamaran.65725/
+
 import numpy as np
 import math
 
@@ -32,8 +37,10 @@ Fn04 = 0.4*math.sqrt(9.81*boat.Lwl)*36/18.52
 Fn03 = 0.3*math.sqrt(9.81*boat.Lwl)*36/18.52
 Fn1 = 1*math.sqrt(9.81*boat.Lwl)*36/18.52
 print(Fn03)
-speed = Fn04
+#speed = Fn04
+speed = 0
 for i in range(0,15):
     Vb_ms = kts2ms(speed)
     print(speed, Vb_ms, boat.get_total_drag(Vb_ms))
-    speed  += (Fn1-Fn04)/14
+    #speed  += (Fn1-Fn04)/14
+    speed  += (Fn04)/12
